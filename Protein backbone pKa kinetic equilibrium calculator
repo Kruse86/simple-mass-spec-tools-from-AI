@@ -1,0 +1,151 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Dec 10 14:01:45 2024
+
+@author: jason
+"""
+
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+import math
+
+# Amino acid properties dictionary
+amino_acid_properties = {
+    'A': {'mass': 89.09,  'iep': 6.01, 'hydrophobicity': 1.8,  'pKa': None,   'n_pKa': 9.69, 'c_pKa': 2.34},  # Alanine
+    'R': {'mass': 174.20, 'iep': 10.76, 'hydrophobicity': -4.5, 'pKa': 12.48, 'n_pKa': 9.04, 'c_pKa': 2.17},  # Arginine
+    'N': {'mass': 132.12, 'iep': 5.41, 'hydrophobicity': -3.5, 'pKa': None,   'n_pKa': 8.80, 'c_pKa': 2.02}, # Asparagine
+    'D': {'mass': 133.10, 'iep': 2.85, 'hydrophobicity': -3.5, 'pKa': None,   'n_pKa': 9.90, 'c_pKa': 1.88}, # Aspartic Acid
+    'C': {'mass': 121.16, 'iep': 5.07, 'hydrophobicity': 2.5,  'pKa': 8.18,   'n_pKa': 10.78, 'c_pKa': 1.96}, # Cysteine
+    'E': {'mass': 147.13, 'iep': 3.15, 'hydrophobicity': -3.5, 'pKa': None,   'n_pKa': 9.60, 'c_pKa': 2.19}, # Glutamic Acid
+    'Q': {'mass': 146.15, 'iep': 5.65, 'hydrophobicity': -3.5, 'pKa': None,   'n_pKa': 9.13, 'c_pKa': 2.17}, # Glutamine
+    'G': {'mass': 75.07,  'iep': 5.97, 'hydrophobicity': -0.4, 'pKa': None,   'n_pKa': 9.60, 'c_pKa': 2.34}, # Glycine
+    'H': {'mass': 155.16, 'iep': 7.59, 'hydrophobicity': -3.2, 'pKa': 6.00,   'n_pKa': 9.33, 'c_pKa': 1.80}, # Histidine
+    'I': {'mass': 131.17, 'iep': 6.05, 'hydrophobicity': 4.5,  'pKa': None,   'n_pKa': 10.53, 'c_pKa': 2.36}, # Isoleucine
+    'L': {'mass': 131.17, 'iep': 6.04, 'hydrophobicity': 3.8,  'pKa': None,   'n_pKa': 10.57, 'c_pKa': 2.36}, # Leucine
+    'K': {'mass': 146.19, 'iep': 9.74, 'hydrophobicity': -3.9, 'pKa': 10.54,  'n_pKa': 8.95, 'c_pKa': 2.16}, # Lysine
+    'M': {'mass': 149.21, 'iep': 5.74, 'hydrophobicity': 1.9,  'pKa': None,   'n_pKa': 9.21, 'c_pKa': 2.28}, # Methionine
+    'F': {'mass': 165.19, 'iep': 5.48, 'hydrophobicity': 2.8,  'pKa': None,   'n_pKa': 9.21, 'c_pKa': 1.83}, # Phenylalanine
+    'P': {'mass': 115.13, 'iep': 6.30, 'hydrophobicity': -1.6, 'pKa': None,   'n_pKa': 10.64, 'c_pKa': 1.99}, # Proline
+    'S': {'mass': 105.09, 'iep': 5.68, 'hydrophobicity': -0.8, 'pKa': None,   'n_pKa': 9.21, 'c_pKa': 2.19}, # Serine
+    'T': {'mass': 119.12, 'iep': 5.60, 'hydrophobicity': -0.7, 'pKa': None,   'n_pKa': 9.10, 'c_pKa': 2.09}, # Threonine
+    'W': {'mass': 204.23, 'iep': 5.89, 'hydrophobicity': -0.9, 'pKa': None,   'n_pKa': 9.39, 'c_pKa': 2.83}, # Tryptophan
+    'Y': {'mass': 181.19, 'iep': 5.66, 'hydrophobicity': -1.3, 'pKa': 10.07,  'n_pKa': 9.11, 'c_pKa': 2.83}, # Tyrosine
+    'V': {'mass': 117.15, 'iep': 5.96, 'hydrophobicity': 4.2,  'pKa': None,   'n_pKa': 9.74, 'c_pKa': 2.32}, # Valine
+}
+
+class AminoAcidAnalyzer:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Amino Acid Sequence Analyzer")
+        self.root.geometry("1000x700")
+        
+        # Input Frame
+        input_frame = tk.Frame(self.root)
+        input_frame.pack(pady=10)
+        
+        tk.Label(input_frame, text="Enter Amino Acid Sequence:").pack(side=tk.LEFT, padx=5)
+        self.sequence_entry = tk.Entry(input_frame, width=50)
+        self.sequence_entry.pack(side=tk.LEFT, padx=5)
+        
+        analyze_button = tk.Button(input_frame, text="Analyze", command=self.analyze_sequence)
+        analyze_button.pack(side=tk.LEFT, padx=5)
+        
+        export_button = tk.Button(input_frame, text="Export", command=self.export_results)
+        export_button.pack(side=tk.LEFT, padx=5)
+
+        # Column selection frame
+        self.columns_frame = tk.Frame(self.root)
+        self.columns_frame.pack(pady=10)
+
+        self.column_vars = {}
+        self.column_checks = {
+            "Amino Acid": tk.BooleanVar(value=True),
+            "Mass": tk.BooleanVar(value=True),
+            "IEP": tk.BooleanVar(value=True),
+            "Hydrophobicity": tk.BooleanVar(value=True),
+            "pKa": tk.BooleanVar(value=True),
+            "N-terminal pKa": tk.BooleanVar(value=True),
+            "C-terminal pKa": tk.BooleanVar(value=True),
+            "Kinetic Equilibrium": tk.BooleanVar(value=True),
+        }
+        
+        for col, var in self.column_checks.items():
+            checkbox = tk.Checkbutton(self.columns_frame, text=col, variable=var)
+            checkbox.pack(anchor="w")
+
+        # Results Frame
+        self.results_frame = tk.Frame(self.root)
+        self.results_frame.pack(pady=10, fill=tk.BOTH, expand=True)
+        self.tree = ttk.Treeview(self.results_frame, 
+                                 columns=list(self.column_checks.keys()), 
+                                 show='headings', 
+                                 height=20)
+        self.tree.pack(fill=tk.BOTH, expand=True)
+
+        # Setting up column headers
+        for col in self.tree["columns"]:
+            self.tree.heading(col, text=col)
+            self.tree.column(col, width=120, anchor="center")
+    
+    def analyze_sequence(self):
+        # Clear previous results
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+
+        sequence = self.sequence_entry.get().strip().upper().replace(" ", "")  # Remove spaces
+        if not sequence:
+            messagebox.showerror("Error", "Please enter a valid amino acid sequence.")
+            return
+        
+        for aa in sequence:
+            if aa not in amino_acid_properties:
+                messagebox.showerror("Error", f"Invalid amino acid: {aa}")
+                return
+        
+        # Populate the treeview with data
+        for i, aa in enumerate(sequence):
+            props = amino_acid_properties[aa]
+            kinetic_equilibrium = None
+            if i < len(sequence) - 1:  # Only calculate for non-terminal amino acids
+                next_aa = sequence[i + 1]
+                next_props = amino_acid_properties[next_aa]
+                # Kinetic equilibrium calculation: K_eq = 10^(pKa_C - pKa_N)
+                if props['c_pKa'] is not None and next_props['n_pKa'] is not None:
+                    kinetic_equilibrium = 10 ** (props['c_pKa'] - next_props['n_pKa'])
+
+            self.tree.insert('', 'end', values=(
+                aa if self.column_checks["Amino Acid"].get() else '',
+                props['mass'] if self.column_checks["Mass"].get() else '',
+                props['iep'] if self.column_checks["IEP"].get() else '',
+                props['hydrophobicity'] if self.column_checks["Hydrophobicity"].get() else '',
+                props['pKa'] if self.column_checks["pKa"].get() else '',
+                props['n_pKa'] if self.column_checks["N-terminal pKa"].get() else '',
+                props['c_pKa'] if self.column_checks["C-terminal pKa"].get() else '',
+                kinetic_equilibrium if self.column_checks["Kinetic Equilibrium"].get() else ''
+            ))
+
+    def export_results(self):
+        """Exports the data shown in the treeview to a text file."""
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt",
+                                                   filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")])
+        if not file_path:
+            return  # User cancelled the dialog
+        
+        try:
+            with open(file_path, 'w') as f:
+                # Write header
+                f.write("\t".join(col for col in self.tree["columns"] if self.column_checks[col].get()) + "\n")
+                # Write each row
+                for row in self.tree.get_children():
+                    f.write("\t".join(str(self.tree.item(row, "values")[i]) 
+                                        for i, col in enumerate(self.tree["columns"]) 
+                                        if self.column_checks[col].get()) + "\n")
+            messagebox.showinfo("Success", "Results exported successfully!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export results: {e}")
+
+# Main execution
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = AminoAcidAnalyzer(root)
+    root.mainloop()
