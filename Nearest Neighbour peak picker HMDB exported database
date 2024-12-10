@@ -1,0 +1,138 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Dec  3 15:09:05 2024
+
+@author: jason
+"""
+import pandas as pd
+import tkinter as tk
+from tkinter import messagebox, filedialog, Scrollbar
+import os
+
+# Load metabolite data from a CSV file
+def load_metabolite_data(file_path):
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+    return pd.read_csv(file_path)
+
+# Function to find nearest neighbors based on the given mass
+def find_nearest_neighbors(data, mass, tolerance):
+    lower_bound = mass - tolerance
+    upper_bound = mass + tolerance
+    filtered_data = data[(data['AVERAGE_MASS'] >= lower_bound) & (data['AVERAGE_MASS'] <= upper_bound)]
+    return filtered_data.sort_values(by='AVERAGE_MASS')
+
+# GUI Application class
+class MetaboliteQuizApp:
+    def __init__(self, master):
+        self.master = master
+        master.title("Metabolite Quiz")
+
+        # GUI elements
+        self.label = tk.Label(master, text="Import mass list (ASCII file):")
+        self.label.pack()
+
+        self.import_button = tk.Button(master, text="Import Mass List", command=self.import_mass_list)
+        self.import_button.pack()
+
+        self.search_button = tk.Button(master, text="Find Neighbors", command=self.find_neighbors)
+        self.search_button.pack()
+        self.search_button.config(state=tk.DISABLED)  # Disable until mass list is imported
+
+        self.export_button = tk.Button(master, text="Export Results as CSV", command=self.export_results_csv)
+        self.export_button.pack()
+        self.export_button.config(state=tk.DISABLED)  # Disable until results are found
+
+        self.tolerance_label = tk.Label(master, text="Select tolerance (dalton):")
+        self.tolerance_label.pack()
+
+        self.tolerance_var = tk.DoubleVar(value=0.1)
+        self.tolerance_frame = tk.Frame(master)
+
+        # Tolerance options
+        for val in [0.1, 0.5, 1.0]:
+            rb = tk.Radiobutton(self.tolerance_frame, text=f"{val}", variable=self.tolerance_var, value=val)
+            rb.pack(side=tk.LEFT)
+        self.tolerance_frame.pack()
+
+        # Create a frame to hold the Text widget and scrollbar
+        self.result_frame = tk.Frame(master)
+        self.result_frame.pack()
+
+        # Create a scrollbar
+        self.scrollbar = Scrollbar(self.result_frame)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Create a Text widget
+        self.results_text = tk.Text(self.result_frame, height=30, width=90, yscrollcommand=self.scrollbar.set)
+        self.results_text.pack(side=tk.LEFT)
+        self.scrollbar.config(command=self.results_text.yview)
+
+        self.data = None
+        self.mass_list = []
+        self.results_df = pd.DataFrame()  # DataFrame to store results for export
+
+    def import_mass_list(self):
+        mass_list_path = filedialog.askopenfilename(title="Select ASCII Mass List",
+                                                     filetypes=(("Text Files", "*.txt"), ("All Files", "*.*")))
+        if mass_list_path:
+            try:
+                self.mass_list = self.read_masses_from_file(mass_list_path)
+                self.data = load_metabolite_data(r"C:/Users/jason/Documents/metabolites-2024-12-10")  # Adjust if needed
+                self.search_button.config(state=tk.NORMAL)  # Enable search button after loading masses
+                messagebox.showinfo("Success", "Mass list imported successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+
+    def read_masses_from_file(self, file_path):
+        with open(file_path, 'r') as f:
+            masses = [float(line.strip().rstrip(',')) for line in f if line.strip()]
+        return masses
+
+    def find_neighbors(self):
+        if self.data is not None and not self.data.empty and self.mass_list:
+            tolerance = self.tolerance_var.get()
+            results = []
+            
+            for mass in self.mass_list:
+                neighbors = find_nearest_neighbors(self.data, mass, tolerance)
+                if not neighbors.empty:
+                    results.append((mass, neighbors[['HMDB_ID', 'NAME', 'AVERAGE_MASS']].copy()))
+
+            # Prepare results for display
+            if results:
+                self.results_text.delete(1.0, tk.END)
+                self.results_df = pd.DataFrame(columns=['Mass', 'HMDB_ID', 'Name', 'Average Mass'])  # DataFrame for results
+                
+                for mass, df in results:
+                    self.results_text.insert(tk.END, f"Mass: {mass} dalton\n")
+                    self.results_text.insert(tk.END, df.to_string(index=False))
+                    self.results_text.insert(tk.END, "\n\n")
+                    
+                    # Append to results DataFrame
+                    df['Mass'] = mass 
+                    self.results_df = pd.concat([self.results_df, df], ignore_index=True)
+
+                self.export_button.config(state=tk.NORMAL)  # Enable export button after finding neighbors
+            else:
+                self.results_text.delete(1.0, tk.END)
+                self.results_text.insert(tk.END, "No metabolites found for any of the masses.\n")
+        else:
+            messagebox.showwarning("Warning", "Please import the mass list and metabolite data first.")
+
+    def export_results_csv(self):
+        if not self.results_df.empty:
+            save_path = filedialog.asksaveasfilename(defaultextension='.csv', 
+                                                       filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
+                                                       title="Save Results As")
+            if save_path:
+                self.results_df.to_csv(save_path, index=False)
+                messagebox.showinfo("Success", "Results exported successfully.")
+        else:
+            messagebox.showwarning("Warning", "No results available to export.")
+
+# Load the metabolite data
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = MetaboliteQuizApp(root)
+    root.mainloop()
