@@ -1,0 +1,128 @@
+import tkinter as tk
+from tkinter import messagebox
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+# Isotopic data for common elements
+ISOTOPIC_DATA = {
+    "C": {"mass_diff": 1.003355, "abundance": 0.011},  # 13C abundance
+    "H": {"mass_diff": 0.000548, "abundance": 0.00015},  # 2H (Deuterium) abundance
+    "O": {"mass_diff": 1.004216, "abundance": 0.002},  # 17O abundance
+}
+
+def calculate_composition(mass):
+    """
+    Estimate the number of C, H, and O atoms in the molecule based on the given mass.
+    Assumes a CnH2nOn ratio.
+    """
+    avg_c_mass = 12.01  # Average atomic mass of carbon
+    avg_h_mass = 1.008  # Average atomic mass of hydrogen
+    avg_o_mass = 16.00  # Average atomic mass of oxygen
+
+    # Calculate approximate number of C atoms
+    n_C = mass / (avg_c_mass + 2 * avg_h_mass + avg_o_mass)
+    n_C = round(n_C)  # Round to the nearest whole number
+
+    # Calculate H and O atoms based on CnH2nOn ratio
+    n_H = 2 * n_C
+    n_O = n_C
+
+    return {"C": n_C, "H": n_H, "O": n_O}
+
+def calculate_isotopic_variance(mass):
+    """
+    Calculate the isotopic variance for a molecule with a CnH2nOn composition.
+    """
+    composition = calculate_composition(mass)
+    variance = 0.0
+    for element, count in composition.items():
+        if element in ISOTOPIC_DATA:
+            mass_diff = ISOTOPIC_DATA[element]["mass_diff"]
+            abundance = ISOTOPIC_DATA[element]["abundance"]
+            variance += count * (mass_diff ** 2) * abundance
+    return variance
+
+def calculate_and_plot():
+    """
+    Handle user input, calculate isotopic variance, and plot the histogram in the GUI.
+    """
+    try:
+        mass = float(entry_mass.get())
+
+        # Calculate isotopic variance
+        variance = calculate_isotopic_variance(mass)
+        if variance == 0:
+            messagebox.showerror("Error", "No isotopic data available for given elements.")
+            return
+
+        # Simulate isotopic variance data
+        num_points = 1000
+        simulated_data = np.random.normal(loc=mass, scale=np.sqrt(variance), size=num_points)
+
+        # Calculate range and quartiles
+        mean_value = np.mean(simulated_data)
+        q1 = np.percentile(simulated_data, 25)
+        q3 = np.percentile(simulated_data, 75)
+        isotopic_range = f"{q1:.2f} to {q3:.2f}"
+
+        # Update isotopic range label
+        label_range.config(text=f"Isotopic Range (25th-75th Percentile): {isotopic_range}")
+        label_mean.config(text=f"Mean Mass: {mean_value:.2f}")
+
+        # Clear any previous plot
+        for widget in frame_plot.winfo_children():
+            widget.destroy()
+
+        # Plot histogram in the GUI
+        fig, ax = plt.subplots(figsize=(6, 4), dpi=100)
+        ax.hist(simulated_data, bins=30, alpha=0.7, color='skyblue', edgecolor='black')
+        ax.axvline(q1, color='red', linestyle='--', label=f'Q1 (25%): {q1:.2f}')
+        ax.axvline(q3, color='blue', linestyle='--', label=f'Q3 (75%): {q3:.2f}')
+        ax.axvline(mean_value, color='green', linestyle='-', label=f'Mean: {mean_value:.2f}')
+        ax.set_title('Isotopic Variance Simulation', fontsize=14)
+        ax.set_xlabel('Mass', fontsize=12)
+        ax.set_ylabel('Frequency', fontsize=12)
+        ax.legend(fontsize=10)
+        ax.grid(alpha=0.5)
+
+        canvas = FigureCanvasTkAgg(fig, master=frame_plot)
+        canvas_widget = canvas.get_tk_widget()
+        canvas_widget.pack()
+        canvas.draw()
+
+    except ValueError:
+        messagebox.showerror("Input Error", "Please enter a valid molecular mass.")
+
+# Set up the GUI
+root = tk.Tk()
+root.title("Isotopic Variance Calculator")
+
+# Input field for molecular mass
+frame_input = tk.Frame(root)
+frame_input.pack(pady=10, padx=20)
+
+tk.Label(frame_input, text="Molecular Mass:").grid(row=0, column=0, padx=5, pady=5)
+entry_mass = tk.Entry(frame_input)
+entry_mass.grid(row=0, column=1, padx=5, pady=5)
+
+# Calculate and plot button
+btn_calculate = tk.Button(root, text="Calculate and Plot", command=calculate_and_plot)
+btn_calculate.pack(pady=10)
+
+# Frame for isotopic range display
+frame_output = tk.Frame(root)
+frame_output.pack(pady=10)
+
+label_range = tk.Label(frame_output, text="Isotopic Range (25th-75th Percentile):", font=("Arial", 12))
+label_range.pack()
+
+label_mean = tk.Label(frame_output, text="Mean Mass:", font=("Arial", 12))
+label_mean.pack()
+
+# Frame for plot display
+frame_plot = tk.Frame(root)
+frame_plot.pack(pady=20, padx=20)
+
+# Run the GUI loop
+root.mainloop()
