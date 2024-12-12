@@ -1,0 +1,121 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from tkinter import Tk, Label, Scale, Button, DoubleVar, IntVar, HORIZONTAL, Frame
+
+# Define a function to calculate time of flight using the standard method
+def calculate_tof_standard(d, U, z, mass_range):
+    return d / np.sqrt(2 * U * z / mass_range)
+
+# Define a function to calculate time of flight using the Euler-Lagrange approach
+def calculate_tof_euler_lagrange(d, U, z, mass_range):
+    # The kinetic energy T = 1/2 * m * v^2 and potential energy V = -q * U
+    # Using L = T - V and solving for motion under these conditions
+    t = []
+    for m in mass_range:
+        v = np.sqrt(2 * U * z / m)  # velocity from energy conservation
+        t.append(d / v)  # time = distance / velocity
+    return np.array(t)
+
+# Function to calculate the mass window for a given time frame
+def calculate_mass_window(d, U, z, sampling_rate_mhz, time_window):
+    time_range = np.linspace(0, time_window, int(time_window * sampling_rate_mhz * 1e6))
+    mass_range = (2 * U * z * (time_range / d) ** 2)
+    return time_range, mass_range
+
+# Function to update the graph based on user input
+def update_graph():
+    d = distance_var.get()
+    U = voltage_var.get()
+    z = charge_var.get()
+    mass_min = mass_min_var.get()
+    mass_max = mass_max_var.get()
+    num_points = points_var.get()
+    sampling_rate = sampling_rate_var.get()
+    time_window = time_window_var.get()
+
+    mass_range = np.linspace(mass_min, mass_max, num_points)
+
+    # Calculate using both methods
+    tof_standard = calculate_tof_standard(d, U, z, mass_range)
+    tof_euler = calculate_tof_euler_lagrange(d, U, z, mass_range)
+
+    # Calculate mass window for given sampling rate and time frame
+    time_range, mass_window = calculate_mass_window(d, U, z, sampling_rate, time_window)
+
+    # Clear the previous plot
+    ax.clear()
+
+    # Plot the results
+    ax.plot(mass_range, tof_standard, label="Standard Method")
+    ax.plot(mass_range, tof_euler, label="Euler-Lagrange Method", linestyle="--")
+    ax.plot(mass_window, time_range, label="Mass Window", linestyle=":")
+    ax.set_xlabel("m/z (mass-to-charge ratio)")
+    ax.set_ylabel("Time of Flight (t) in seconds")
+    ax.set_title("MALDI-TOF Time of Flight vs. Mass-to-Charge Ratio")
+    ax.legend()
+    ax.grid(True)
+
+    # Draw the updated figure
+    canvas.draw()
+
+# Create the GUI
+root = Tk()
+root.title("MALDI-TOF Time of Flight Simulator")
+
+# Enable window resizing to adapt to screen size
+root.geometry("800x600")
+root.rowconfigure(0, weight=1)
+root.columnconfigure(0, weight=1)
+
+# Variables for user input
+distance_var = DoubleVar(value=1.0)
+voltage_var = DoubleVar(value=20000.0)
+charge_var = IntVar(value=1)
+mass_min_var = DoubleVar(value=1.0)
+mass_max_var = DoubleVar(value=150000.0)
+points_var = IntVar(value=1000)
+sampling_rate_var = DoubleVar(value=10.0)  # in MHz
+time_window_var = DoubleVar(value=1.0)  # in microseconds
+
+# Create input sliders and labels
+Label(root, text="Distance to Detector (d) [m]").pack()
+Scale(root, from_=0.1, to=5.0, resolution=0.1, orient=HORIZONTAL, variable=distance_var).pack()
+
+Label(root, text="Acceleration Voltage (U) [V]").pack()
+Scale(root, from_=1000, to=100000, resolution=1000, orient=HORIZONTAL, variable=voltage_var).pack()
+
+Label(root, text="Charge State (z)").pack()
+Scale(root, from_=1, to=5, orient=HORIZONTAL, variable=charge_var).pack()
+
+Label(root, text="Minimum m/z").pack()
+Scale(root, from_=1, to=500, resolution=1, orient=HORIZONTAL, variable=mass_min_var).pack()
+
+Label(root, text="Maximum m/z").pack()
+Scale(root, from_=100, to=150000, resolution=100, orient=HORIZONTAL, variable=mass_max_var).pack()
+
+Label(root, text="Number of Points").pack()
+Scale(root, from_=100, to=5000, resolution=100, orient=HORIZONTAL, variable=points_var).pack()
+
+Label(root, text="Sampling Rate (MHz)").pack()
+Scale(root, from_=1, to=100, resolution=1, orient=HORIZONTAL, variable=sampling_rate_var).pack()
+
+Label(root, text="Time Window (us)").pack()
+Scale(root, from_=0.1, to=10.0, resolution=0.1, orient=HORIZONTAL, variable=time_window_var).pack()
+
+# Create a frame for the plot
+plot_frame = Frame(root)
+plot_frame.pack(fill="both", expand=True)
+plot_frame.rowconfigure(0, weight=1)
+plot_frame.columnconfigure(0, weight=1)
+
+# Create the matplotlib figure and axis
+fig, ax = plt.subplots(figsize=(8, 5))
+canvas = FigureCanvasTkAgg(fig, master=plot_frame)
+canvas.get_tk_widget().pack(fill="both", expand=True)
+
+# Create a button to update the graph
+Button(root, text="Update Graph", command=update_graph).pack()
+
+# Run the GUI
+root.mainloop()
